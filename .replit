@@ -8,38 +8,32 @@ localPort = 5000
 externalPort = 80
 
 [env]
-JWT_SECRET = "ireport-jwt-secret-key-replit-2026"
-BACKEND_PORT = "5000"
 NODE_ENV = "production"
-MONGODB_URI = "mongodb+srv://Arlys-bit:2026iReport31415926@ireport-cluster.or1zaaw.mongodb.net/?appName=iReport-Cluster"
-CORS_ORIGIN = "https://iReport-files--Arlys-bit.replit.app"
+PORT = "5000"
 
 [deployment]
-run = ["bash", "-c", "cd iReport_Backend && npx ts-node src/index.ts"]
-
-[agent]
-expertMode = true
+run = ["bash", "-lc", "cd iReport_Backend && npm install && npm run dev"]
 
 [workflows]
-runButton = "Project"
+runButton = "Backend"
 
 [[workflows.workflow]]
-name = "Project"
-mode = "parallel"
-author = "agent"
-
-[[workflows.workflow.tasks]]
-task = "workflow.run"
-args = "Start application"
-
-[[workflows.workflow]]
-name = "Start application"
+name = "Backend"
 author = "agent"
 
 [[workflows.workflow.tasks]]
 task = "shell.exec"
-args = "cd iReport_Backend && npx ts-node src/index.ts & cd iReport/iReport && CI=1 npx expo start --web --port 5000 --host localhost"
+args = "cd iReport_Backend && npm run dev"
 waitForPort = 5000
 
 [workflows.workflow.metadata]
 outputType = "webview"
+
+[userenv]
+
+[userenv.shared]
+JWT_SECRET = "n7Qm2!zP9#kL4vT8xR1cB6uW0@dF3hY5"
+BACKEND_PORT = "5000"
+NODE_ENV = "production"
+MONGODB_URI = "mongodb+srv://Arlys-bit:2026iReports31415926@ireport-cluster.or1zaaw.mongodb.net/?appName=iReport-Cluster"
+CORS_ORIGIN = "https://iReport-files--Arlys-bit.replit.app"
