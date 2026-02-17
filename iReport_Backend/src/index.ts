@@ -24,7 +24,8 @@ if (missingEnvVars.length > 0) {
 
 const app = express();
 const PORT = process.env.PORT || 5000;
-
+// Trust proxy - FIX for Replit
+app.set('trust proxy', 1);
 // Security Middleware
 app.use(helmet()); // Set security HTTP headers
 app.use(cors({

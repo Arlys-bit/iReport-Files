@@ -148,16 +148,12 @@ You should see output like:
 In PowerShell, replace `YOUR_GITHUB_USERNAME` with your actual username and run:
 
 ```bash
-git remote add origin https://github.com/YOUR_GITHUB_USERNAME/iReport-backend.git
+git remote add origin https://github.com/Arlys-bit/iReport-Files.git
 git branch -M main
 git push -u origin main
 ```
 
-You may be asked for your GitHub username and password. Enter them.
-
-⏳ Wait for upload (might take 1-2 minutes)
-
-✅ **Done! Your code is on GitHub**
+**Your command is ready! Run it in PowerShell.**
 
 ---
 
