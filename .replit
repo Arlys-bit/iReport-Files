@@ -36,10 +36,14 @@ args = "Start application"
 name = "Start application"
 author = "agent"
 
-[[workflows.workflow.tasks]]
-task = "shell.exec"
-args = "cd /home/runner/workspace/iReport_Backend && npx ts-node src/index.ts & cd /home/runner/workspace/iReport/iReport && CI=1 npx expo start --web --port 5000"
-waitForPort = 5000
-
 [workflows.workflow.metadata]
 outputType = "webview"
+
+[[workflows.workflow.tasks]]
+task = "shell.exec"
+args = "cd /home/runner/workspace/iReport_Backend && npx ts-node src/index.ts & cd /home/runner/workspace/iReport/iReport && CI=1 npx expo start --web --port 5000 --host localhost"
+waitForPort = 5000
+
+[deployment]
+deploymentTarget = "vm"
+run = ["bash", "-c", "cd iReport_Backend && npm start & cd iReport/iReport && npx expo start --web --port 5000 --host localhost"]
