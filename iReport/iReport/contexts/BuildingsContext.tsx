@@ -2,6 +2,12 @@ import createContextHook from '@nkzw/create-context-hook';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState, useEffect, useCallback } from 'react';
+import {
+  AUTH_TOKEN_STORAGE_KEY,
+  createBackendBuilding,
+  getBackendBuildings,
+  hasBackendApi,
+} from '@/lib/backendApi';
 
 export type DynamicBuilding = {
   id: string;
@@ -20,6 +26,18 @@ export const [BuildingsProvider, useBuildings] = createContextHook(() => {
   const buildingsQuery = useQuery({
     queryKey: ['buildings'],
     queryFn: async () => {
+      const token = await AsyncStorage.getItem(AUTH_TOKEN_STORAGE_KEY);
+      if (token && hasBackendApi) {
+        const result = await getBackendBuildings(token);
+        return result.buildings.map((building, index) => ({
+          id: building._id,
+          name: building.name,
+          floors: Math.max(1, building.rooms?.length || 1),
+          color: ['#3B82F6', '#6366F1', '#10B981', '#F59E0B', '#DC2626'][index % 5],
+          isActive: true,
+        })) as DynamicBuilding[];
+      }
+
       const stored = await AsyncStorage.getItem(STORAGE_KEY);
       return stored ? JSON.parse(stored) as DynamicBuilding[] : [];
     },
@@ -38,6 +56,22 @@ export const [BuildingsProvider, useBuildings] = createContextHook(() => {
 
   const addBuildingMutation = useMutation({
     mutationFn: async (data: { name: string; floors: number; color: string; isActive?: boolean }) => {
+      const token = await AsyncStorage.getItem(AUTH_TOKEN_STORAGE_KEY);
+      if (token && hasBackendApi) {
+        await createBackendBuilding(token, {
+          name: data.name,
+          description: `${data.floors} floor(s)`,
+        });
+        queryClient.invalidateQueries({ queryKey: ['buildings'] });
+        return {
+          id: `tmp_${Date.now()}`,
+          name: data.name,
+          floors: data.floors,
+          color: data.color,
+          isActive: data.isActive ?? true,
+        } as DynamicBuilding;
+      }
+
       const newBuilding: DynamicBuilding = {
         id: `b_${Date.now()}`,
         name: data.name,

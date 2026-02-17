@@ -3,10 +3,18 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { useState, useEffect } from 'react';
 import { User, StaffMember, Student, UserRole, StaffPermission, hasPermission } from '@/types';
+import { AUTH_TOKEN_STORAGE_KEY, hasBackendApi, loginWithBackend } from '@/lib/backendApi';
 
 const STORAGE_KEYS = {
   CURRENT_USER: 'school_current_user',
   STAFF: 'school_staff_members',
+};
+
+const BACKEND_ROLE_MAP: Record<'student' | 'teacher' | 'admin' | 'staff', UserRole> = {
+  student: 'student',
+  teacher: 'teacher',
+  admin: 'admin',
+  staff: 'guidance',
 };
 
 const DEFAULT_ADMIN: StaffMember = {
@@ -81,6 +89,51 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
 
   const loginMutation = useMutation({
     mutationFn: async ({ email, password }: { email: string; password: string }) => {
+      // Prefer backend authentication when API URL is configured.
+      if (hasBackendApi) {
+        const result = await loginWithBackend(email, password);
+        const mappedRole = BACKEND_ROLE_MAP[result.user.role] || 'student';
+
+        if (mappedRole === 'student') {
+          const backendStudent: Student = {
+            id: result.user.id,
+            role: 'student',
+            fullName: result.user.name,
+            email: result.user.email,
+            schoolEmail: result.user.email,
+            password: '',
+            profilePhoto: undefined,
+            createdAt: new Date().toISOString(),
+            isActive: true,
+            lrn: result.user.id.slice(-6),
+            gradeLevelId: 'g7',
+            sectionId: 'backend',
+            violationHistory: [],
+          };
+          await AsyncStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(backendStudent));
+          await AsyncStorage.setItem(AUTH_TOKEN_STORAGE_KEY, result.token);
+          return backendStudent;
+        }
+
+        const backendStaff: StaffMember = {
+          id: result.user.id,
+          role: mappedRole as StaffMember['role'],
+          fullName: result.user.name,
+          email: result.user.email,
+          schoolEmail: result.user.email,
+          password: '',
+          profilePhoto: undefined,
+          createdAt: new Date().toISOString(),
+          isActive: true,
+          staffId: result.user.id.slice(-6).toUpperCase(),
+          position: mappedRole === 'teacher' ? 'teacher' : 'guidance_counselor',
+          permissions: [],
+        };
+        await AsyncStorage.setItem(STORAGE_KEYS.CURRENT_USER, JSON.stringify(backendStaff));
+        await AsyncStorage.setItem(AUTH_TOKEN_STORAGE_KEY, result.token);
+        return backendStaff;
+      }
+
       // Ensure data is loaded before login attempt
       let staffMembers: StaffMember[] = staffQuery.data || [];
       const students: Student[] = studentsQuery.data || [];
@@ -130,6 +183,7 @@ export const [AuthProvider, useAuth] = createContextHook(() => {
   const logoutMutation = useMutation({
     mutationFn: async () => {
       await AsyncStorage.removeItem(STORAGE_KEYS.CURRENT_USER);
+      await AsyncStorage.removeItem(AUTH_TOKEN_STORAGE_KEY);
     },
     onSuccess: () => {
       setCurrentUser(null);

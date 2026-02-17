@@ -2,10 +2,36 @@ import createContextHook from '@nkzw/create-context-hook';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { IncidentReport, ReportStatus, ReportReviewHistory, Notification } from '@/types';
+import {
+  AUTH_TOKEN_STORAGE_KEY,
+  createBackendReport,
+  getBackendReports,
+  hasBackendApi,
+} from '@/lib/backendApi';
 
 const STORAGE_KEYS = {
   REPORTS: 'school_reports',
   NOTIFICATIONS: 'school_notifications',
+};
+
+const mapBackendStatus = (status?: string): ReportStatus => {
+  if (status === 'resolved' || status === 'accepted') return 'accepted';
+  if (status === 'declined' || status === 'rejected') return 'declined';
+  return 'under_review';
+};
+
+const mapBackendTypeToIncident = (type?: string) => {
+  if (type === 'incident') return 'fighting';
+  if (type === 'behavior') return 'Verbal Threats';
+  if (type === 'health') return 'other';
+  return 'Group Bullying';
+};
+
+const mapIncidentToBackendType = (incidentType: string): 'academic' | 'behavior' | 'incident' | 'health' => {
+  if (incidentType === 'fighting' || incidentType === 'physical_assault') return 'incident';
+  if (incidentType === 'cyberbullying' || incidentType === 'harassment' || incidentType === 'verbal_abuse') return 'behavior';
+  if (incidentType === 'other') return 'academic';
+  return 'behavior';
 };
 
 export const [ReportsProvider, useReports] = createContextHook(() => {
@@ -14,6 +40,48 @@ export const [ReportsProvider, useReports] = createContextHook(() => {
   const reportsQuery = useQuery({
     queryKey: ['reports'],
     queryFn: async () => {
+      const token = await AsyncStorage.getItem(AUTH_TOKEN_STORAGE_KEY);
+      if (token && hasBackendApi) {
+        const result = await getBackendReports(token);
+        return result.reports.map((report) => {
+          const student = typeof report.studentId === 'object' ? report.studentId : undefined;
+          const createdAt = report.createdAt || new Date().toISOString();
+          return {
+            id: report._id,
+            reporterId: student?._id || 'unknown',
+            reporterName: 'Student',
+            reporterLRN: student?.studentId || '',
+            reporterGradeLevelId: 'g7',
+            reporterSectionId: (student?.section || '').toLowerCase() || 'backend',
+            reporterPhoto: undefined,
+            isAnonymous: false,
+            acknowledgedAnonymous: false,
+            victimName: 'Reported Student',
+            location: {
+              building: 'A',
+              floor: '1st',
+              room: 'N/A',
+            },
+            incidentType: mapBackendTypeToIncident(report.reportType),
+            description: report.description || '',
+            dateTime: createdAt,
+            cantRememberDateTime: false,
+            photoEvidence: undefined,
+            reportingForSelf: true,
+            status: mapBackendStatus(report.status),
+            priority: report.priority === 'high' ? 'high' : report.priority === 'low' ? 'low' : 'medium',
+            assignedTeacherId: undefined,
+            reviewHistory: [],
+            adminNotes: report.title || undefined,
+            declineReason: undefined,
+            createdAt,
+            updatedAt: report.updatedAt || createdAt,
+            reviewedAt: undefined,
+            reviewedBy: undefined,
+          } as IncidentReport;
+        });
+      }
+
       const stored = await AsyncStorage.getItem(STORAGE_KEYS.REPORTS);
       return stored ? JSON.parse(stored) : [];
     },
@@ -49,6 +117,27 @@ export const [ReportsProvider, useReports] = createContextHook(() => {
 
   const createReportMutation = useMutation({
     mutationFn: async (report: Omit<IncidentReport, 'id' | 'createdAt' | 'updatedAt' | 'status' | 'priority' | 'reviewHistory'>) => {
+      const token = await AsyncStorage.getItem(AUTH_TOKEN_STORAGE_KEY);
+      if (token && hasBackendApi) {
+        await createBackendReport(token, {
+          studentId: report.reporterId,
+          reportType: mapIncidentToBackendType(report.incidentType),
+          title: report.incidentType,
+          description: report.description || `${report.victimName} report`,
+          priority: 'medium',
+        });
+        queryClient.invalidateQueries({ queryKey: ['reports'] });
+        return {
+          ...report,
+          id: `tmp_${Date.now()}`,
+          status: 'under_review',
+          priority: 'medium',
+          reviewHistory: [],
+          createdAt: new Date().toISOString(),
+          updatedAt: new Date().toISOString(),
+        } as IncidentReport;
+      }
+
       const reports: IncidentReport[] = reportsQuery.data || [];
       
       const priority = report.incidentType === 'physical_assault' || report.incidentType === 'fighting' 

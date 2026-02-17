@@ -2,6 +2,7 @@ import createContextHook from '@nkzw/create-context-hook';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Student, GradeLevel, Section, ViolationRecord } from '@/types';
+import { AUTH_TOKEN_STORAGE_KEY, createBackendStudent, getBackendStudents, hasBackendApi } from '@/lib/backendApi';
 
 const STORAGE_KEYS = {
   STUDENTS: 'school_students',
@@ -18,12 +19,49 @@ const DEFAULT_GRADE_LEVELS: GradeLevel[] = [
   { id: 'g12', name: 'Grade 12', order: 6, isActive: true },
 ];
 
+const parseGradeLevelId = (classValue?: string) => {
+  if (!classValue) return 'g7';
+  const match = classValue.match(/(\d+)/);
+  if (!match) return 'g7';
+  return `g${match[1]}`;
+};
+
+const normalizeSectionId = (sectionValue?: string) => {
+  const raw = (sectionValue || 'default').trim().toLowerCase();
+  return raw.replace(/[^a-z0-9]+/g, '_');
+};
+
 export const [StudentsProvider, useStudents] = createContextHook(() => {
   const queryClient = useQueryClient();
 
   const studentsQuery = useQuery({
     queryKey: ['students'],
     queryFn: async () => {
+      const token = await AsyncStorage.getItem(AUTH_TOKEN_STORAGE_KEY);
+      if (token && hasBackendApi) {
+        const result = await getBackendStudents(token);
+        return result.students.map((student) => {
+          const user = typeof student.userId === 'object' ? student.userId : undefined;
+          const gradeLevelId = parseGradeLevelId(student.class);
+          const sectionId = normalizeSectionId(student.section);
+          return {
+            id: student._id,
+            role: 'student',
+            fullName: user?.name || 'Student',
+            email: user?.email || '',
+            schoolEmail: user?.email || '',
+            password: '',
+            profilePhoto: undefined,
+            createdAt: student.createdAt || new Date().toISOString(),
+            isActive: true,
+            lrn: student.studentId || student._id.slice(-8),
+            gradeLevelId,
+            sectionId,
+            violationHistory: [],
+          } as Student;
+        });
+      }
+
       const stored = await AsyncStorage.getItem(STORAGE_KEYS.STUDENTS);
       return stored ? JSON.parse(stored) : [];
     },
@@ -124,6 +162,29 @@ export const [StudentsProvider, useStudents] = createContextHook(() => {
 
   const createStudentMutation = useMutation({
     mutationFn: async (data: Omit<Student, 'id' | 'createdAt' | 'role' | 'isActive' | 'violationHistory'>) => {
+      const token = await AsyncStorage.getItem(AUTH_TOKEN_STORAGE_KEY);
+      if (token && hasBackendApi) {
+        const gradeLabel = gradeLevelsQuery.data?.find((g) => g.id === data.gradeLevelId)?.name || 'Grade';
+        const sectionLabel = sectionsQuery.data?.find((s) => s.id === data.sectionId)?.name || data.sectionId;
+        await createBackendStudent(token, {
+          name: data.fullName,
+          email: data.email,
+          password: data.password,
+          studentId: data.lrn,
+          class: `${gradeLabel}-${sectionLabel}`,
+          section: sectionLabel,
+        });
+        queryClient.invalidateQueries({ queryKey: ['students'] });
+        return {
+          ...data,
+          id: `student_${Date.now()}`,
+          role: 'student',
+          isActive: true,
+          violationHistory: [],
+          createdAt: new Date().toISOString(),
+        } as Student;
+      }
+
       const students: Student[] = studentsQuery.data || [];
       
       const lrnExists = students.some(s => s.lrn === data.lrn);
