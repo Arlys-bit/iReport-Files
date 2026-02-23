@@ -113,15 +113,3 @@ LiveReport.init(
 );
 
 export default LiveReport;
-      enum: ['active', 'acknowledged', 'resolved'],
-      default: 'active'
-    },
-    witnesses: [String],
-    attachments: [String]
-  },
-  {
-    timestamps: true
-  }
-);
-
-export const LiveReport = mongoose.model<ILiveReport>('LiveReport', liveReportSchema);

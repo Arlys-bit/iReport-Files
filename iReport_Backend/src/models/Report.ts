@@ -115,35 +115,3 @@ Report.init(
 );
 
 export default Report;
-    title: {
-      type: String,
-      required: true
-    },
-    description: {
-      type: String,
-      required: true
-    },
-    createdBy: {
-      type: Schema.Types.ObjectId,
-      ref: 'User',
-      required: true
-    },
-    priority: {
-      type: String,
-      enum: ['low', 'medium', 'high'],
-      default: 'medium'
-    },
-    status: {
-      type: String,
-      enum: ['open', 'in_progress', 'resolved', 'closed'],
-      default: 'open'
-    },
-    attachments: [String],
-    comments: [commentSchema]
-  },
-  {
-    timestamps: true
-  }
-);
-
-export const Report = mongoose.model<IReport>('Report', reportSchema);

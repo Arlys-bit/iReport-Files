@@ -85,11 +85,3 @@ User.init(
 );
 
 export default User;
-  next();
-});
-
-userSchema.methods.comparePassword = async function(password: string) {
-  return comparePassword(password, this.password);
-};
-
-export const User = mongoose.model<IUser>('User', userSchema);
